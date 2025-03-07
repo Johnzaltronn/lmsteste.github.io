@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CEMADEC - Centro de Monitoramento e Alerta - Defesa Civil POA</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyC13UTbnQp__ewEYpnQusB7br_ShjphJ1I&callback=initMap"></script>
+    <style>
+        /* CSS original mantido */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: linear-gradient(135deg, #1a2a3f, #2a3b5a);
+            font-family: 'Roboto', 'Segoe UI', Arial, sans-serif;
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 0;
+            overflow-x: hidden;
+            transition: background 0.5s ease, color 0.5s ease;
+            animation: fadeInBody 1s ease-in-out;
+        }
+        body.light-theme {
+            background: linear-gradient(135deg, #e0e7f5, #f0f4fa);
+            color: #333;
+        }
+        body.dc-theme {
+            background: linear-gradient(135deg, #003087, #001e5f);
+            color: #fff;
+        }
+        @keyframes fadeInBody {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .container {
+            max-width: 100%;
+            width: 100%;
+            margin: 0 auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            min-height: 100vh;
+        }
+        .header {
+            text-align: center;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 20px;
+            border-radius: 15px;
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+            animation: slideIn 0.8s ease-out;
+        }
+        body.light-theme .header {
+            background: rgba(0, 0, 0, 0.05);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+        }
+        body.dc-theme .header {
+            background: rgba(245, 166, 35, 0.1);
+            border: 1px solid rgba(245, 166, 35, 0.3);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-50px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .header img {
+            width: 150px;
+            filter: brightness(1.2) drop-shadow(0 0 10px rgba(255, 255, 255, 0.5));
+            transition: transform 0.3s ease;
+        }
+        body.light-theme .header img {
+            filter: brightness(1) drop-shadow(0 0 5px rgba(0, 0, 0, 0.2));
+        }
+        body.dc-theme .header img {
+            filter: brightness(1.1) drop-shadow(0 0 10px rgba(245, 166, 35, 0.5));
+        }
+        .header img:hover {
+            transform: scale(1.1);
+        }
+        .header h1 {
+            font-size: 2em;
+            margin-top: 15px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            text-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+        }
+        body.light-theme .header h1 {
+            text-shadow: none;
+            color: #333;
+        }
+        body.dc-theme .header h1 {
+            color: #f5a623;
+            text-shadow: 0 2px 5px rgba(0, 0, 0, 0.4);
+        }
+        .theme-buttons {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        .theme-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 25px;
+            font-size: 0.9em;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+        .dark-btn {
+            background: #2a3b5a;
+            color: #fff;
+        }
+        .dark-btn:hover {
+            background: #3b4e7a;
+            transform: translateY(-3px);
+        }
+        .light-btn {
+            background: #f0f4fa;
+            color: #333;
+        }
+        .light-btn:hover {
+            background: #ffffff;
+            transform: translateY(-3px);
+        }
+        .dc-btn {
+            background: linear-gradient(135deg, #003087, #f5a623);
+            color: #fff;
+            position: relative;
+            overflow: hidden;
+        }
+        .dc-btn::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            transition: width 0.4s ease, height 0.4s ease;
+        }
+        .dc-btn:hover::after {
+            width: 200px;
+            height: 200px;
+        }
+        .dc-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+        .stats {
+            text-align: center;
+            font-size: 1.3em;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            animation: fadeInStats 1s ease-in-out 0.5s forwards;
+            opacity: 0;
+        }
+        body.light-theme .stats {
+            background: rgba(0, 0, 0, 0.05);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+        }
+        body.dc-theme .stats {
+            background: rgba(245, 166, 35, 0.1);
+            box-shadow: 0 4px 15px rgba(0, 48, 135, 0.2);
+        }
+        @keyframes fadeInStats {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .stats span {
+            font-weight: 700;
+            color: #ff6b6b;
+            text-shadow: 0 0 5px rgba(255, 107, 107, 0.5);
+        }
+        body.light-theme .stats span {
+            color: #e63946;
+            text-shadow: none;
+        }
+        body.dc-theme .stats span {
+            color: #f5a623;
+            text-shadow: 0 0 5px rgba(245, 166, 35, 0.5);
+        }
+        .cards {
+            display: flex;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            gap: 20px;
+            padding: 15px 0;
+            scroll-snap-type: x mandatory;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+            flex-grow: 1;
+        }
+        .card {
+            flex: 0 0 300px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 15px;
+            padding: 20px;
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            transition: all 0.4s ease;
+            box-shadow: 0 6px 25px rgba(0, 0, 0, 0.15);
+            scroll-snap-align: start;
+            animation: cardPop 0.6s ease-out forwards;
+            opacity: 0;
+        }
+        body.light-theme .card {
+            background: rgba(255, 255, 255, 0.8);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+        }
+        body.dc-theme .card {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(245, 166, 35, 0.3);
+            box-shadow: 0 6px 25px rgba(0, 48, 135, 0.3);
+        }
+        @keyframes cardPop {
+            from { opacity: 0; transform: scale(0.9) translateY(20px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .card:hover {
+            transform: translateY(-10px) scale(1.02);
+            background: rgba(255, 255, 255, 0.12);
+            box-shadow: 0 10px 35px rgba(0, 0, 0, 0.25);
+        }
+        body.light-theme .card:hover {
+            background: rgba(255, 255, 255, 0.9);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        }
+        body.dc-theme .card:hover {
+            background: rgba(245, 166, 35, 0.15);
+            box-shadow: 0 10px 35px rgba(0, 48, 135, 0.4);
+        }
+        .card h3 {
+            margin: 0 0 15px;
+            font-size: 1.2em;
+            font-weight: 500;
+            color: #ffffff;
+            text-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+            letter-spacing: 0.5px;
+        }
+        body.light-theme .card h3 {
+            color: #333;
+            text-shadow: none;
+        }
+        body.dc-theme .card h3 {
+            color: #fff;
+            text-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+        }
+        .card .highlight-data {
+            margin: 10px 0;
+            font-size: 1.5em;
+            font-weight: 600;
+            line-height: 1.2;
+            transition: transform 0.3s ease;
+        }
+        .card:hover .highlight-data {
+            transform: scale(1.05);
+        }
+        .card .temp { color: #ff6b6b; }
+        .card .precip { color: #4ecdc4; }
+        body.light-theme .card .temp { color: #e63946; }
+        body.light-theme .card .precip { color: #1d3557; }
+        body.dc-theme .card .temp { color: #f5a623; }
+        body.dc-theme .card .precip { color: #00b7eb; }
+        .card p {
+            margin: 8px 0;
+            font-size: 0.9em;
+            line-height: 1.4;
+            color: rgba(255, 255, 255, 0.85);
+        }
+        body.light-theme .card p {
+            color: rgba(0, 0, 0, 0.75);
+        }
+        body.dc-theme .card p {
+            color: rgba(255, 255, 255, 0.9);
+        }
+        canvas {
+            width: 100% !important;
+            height: 80px !important;
+            margin: 15px 0;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.05);
+        }
+        body.light-theme canvas {
+            background: rgba(0, 0, 0, 0.05);
+        }
+        body.dc-theme canvas {
+            background: rgba(245, 166, 35, 0.05);
+        }
+        #map {
+            height: 400px;
+            width: 100%;
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.05);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+            animation: fadeInMap 1s ease-in-out 0.8s forwards;
+            opacity: 0;
+        }
+        body.light-theme #map {
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            background: rgba(255, 255, 255, 0.9);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+        }
+        body.dc-theme #map {
+            border: 1px solid rgba(245, 166, 35, 0.3);
+            background: rgba(255, 255, 255, 0.08);
+            box-shadow: 0 8px 30px rgba(0, 48, 135, 0.3);
+        }
+        @keyframes fadeInMap {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @media (max-width: 768px) {
+            .header img { width: 120px; }
+            .header h1 { font-size: 1.5em; }
+            .stats { font-size: 1.1em; }
+            .card { flex: 0 0 260px; padding: 15px; }
+            .card h3 { font-size: 1.1em; }
+            .card .highlight-data { font-size: 1.3em; }
+            .card p { font-size: 0.85em; }
+            canvas { height: 70px !important; }
+            #map { height: 350px; }
+            .theme-btn { padding: 8px 15px; font-size: 0.8em; }
+        }
+        @media (max-width: 480px) {
+            .container { padding: 10px; }
+            .header img { width: 100px; }
+            .header h1 { font-size: 1.2em; }
+            .stats { font-size: 1em; }
+            .cards { gap: 15px; }
+            .card { flex: 0 0 220px; padding: 12px; }
+            .card h3 { font-size: 1em; }
+            .card .highlight-data { font-size: 1.2em; }
+            .card p { font-size: 0.8em; }
+            canvas { height: 60px !important; }
+            #map { height: 300px; }
+            .theme-buttons { top: 10px; right: 10px; }
+            .theme-btn { padding: 6px 12px; font-size: 0.7em; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="dc.png" alt="Defesa Civil Porto Alegre">
+            <h1 id="dynamicTitle">CEMADEC - Centro de Monitoramento e Alerta</h1>
+        </div>
+        <div class="theme-buttons">
+            <button class="theme-btn dark-btn" onclick="setTheme('dark')">Escuro</button>
+            <button class="theme-btn light-btn" onclick="setTheme('light')">Claro</button>
+            <button class="theme-btn dc-btn" onclick="setTheme('dc')">Defesa Civil</button>
+        </div>
+        <div class="stats">
+            Total de Ocorrências no Mês: <span id="totalOccurrences">0</span>
+        </div>
+        <div class="cards" id="weatherCards"></div>
+        <div id="map"></div>
+    </div>
+
+    <script>
+        // Dados GeoJSON originais
+        var geojsonDataExtra = {
+            "type": "FeatureCollection",
+            "name": "analise_risco_geologico_cprm",
+            "features": [
+                {"type": "Feature", "properties": {"local": "Travessa do Espigão, Bairro Lami", "setor": "RS_PORTOAL_SR_001_CPRM", "tipologia": "Inundação", "grau_risco": "Alto", "link": "\\\\geopmpa\\geopmpa\\SPM\\GEO\\CPRM\\Setores de risco\\RS_PORTOAL_SR_001_CPRM.pdf", "created_us": "GEOLICEN", "created_da": "2023-04-10T00:00:00", "last_edite": "GEOLICEN", "last_edi_1": "2023-04-10T00:00:00", "st_area_sh": 1.191534e-05, "st_length_": "0.01434241199"}, "geometry": {"type": "Polygon", "coordinates": [[[-51.0856848, -30.2359044], [-51.0864303, -30.2381415], [-51.0856129, -30.2384113], [-51.0836792, -30.2390834], [-51.0829636, -30.2393749], [-51.0825703, -30.239594], [-51.0823078, -30.239343], [-51.0817439, -30.2387012], [-51.0815271, -30.2383987], [-51.0812291, -30.2378489], [-51.0809594, -30.2371812], [-51.0811097, -30.2370696], [-51.0814949, -30.236901], [-51.0822517, -30.2367924], [-51.0856848, -30.2359044]]]}},
+                {"type": "Feature", "properties": {"local": "Rua Músico Nelson Ferreira, Bairro Cel. Aparício Borges", "setor": "RS_PORTOAL_SR_138_CPRM", "tipologia": "Deslizamento", "grau_risco": "Alto", "link": "\\\\geopmpa\\geopmpa\\SPM\\GEO\\CPRM\\Setores de risco\\RS_PORTOAL_SR_138_CPRM.pdf", "created_us": "GEOLICEN", "created_da": "2023-04-10T00:00:00", "last_edite": "GEOLICEN", "last_edi_1": "2023-04-10T00:00:00", "st_area_sh": 3.03422e-06, "st_length_": "0.01109970794"}, "geometry": {"type": "Polygon", "coordinates": [[[-51.1818969, -30.0761416], [-51.1820449, -30.0760421], [-51.1821955, -30.076185], [-51.1820245, -30.076407], [-51.1821113, -30.0766291], [-51.1816289, -30.0769787], [-51.1810904, -30.0771446], [-51.1808939, -30.0771956], [-51.1803528, -30.0771522], [-51.1799394, -30.0771676], [-51.179799, -30.0771905], [-51.1796, -30.0771089], [-51.1794009, -30.0770808], [-51.1789032, -30.0771471], [-51.1787501, -30.0771982], [-51.1785689, -30.0774126], [-51.1783749, -30.0775146], [-51.1780202, -30.0773539], [-51.1774664, -30.0774508], [-51.1774664, -30.0771854], [-51.1779385, -30.0770399], [-51.1781325, -30.0769021], [-51.1784438, -30.0765933], [-51.1788139, -30.0763356], [-51.1789517, -30.0764581], [-51.1791074, -30.0764912], [-51.1793039, -30.0764581], [-51.1797761, -30.0765193], [-51.1802584, -30.0766801], [-51.1804881, -30.0764121], [-51.1808326, -30.0763662], [-51.181218, -30.0762947], [-51.1817386, -30.0761824], [-51.1818969, -30.0761416]]]}},
+                {"type": "Feature", "properties": {"local": "Acesso por Rua Irmã Nely, Comunidade Maria Degolada, Bairro Paternon", "setor": "RS_PORTOAL_SR_142_CPRM", "tipologia": "Queda", "grau_risco": "Alto", "link": "\\\\geopmpa\\geopmpa\\SPM\\GEO\\CPRM\\Setores de risco\\RS_PORTOAL_SR_142_CPRM.pdf", "created_us": "GEOLICEN", "created_da": "2023-04-10T00:00:00", "last_edite": "GEOLICEN", "last_edi_1": "2023-04-10T00:00:00", "st_area_sh": 1.8066e-07, "st_length_": "0.00189180697"}, "geometry": {"type": "Polygon", "coordinates": [[[-51.1953302, -30.0657129], [-51.1953267, -30.0658758], [-51.1952814, -30.0658845], [-51.1953137, -30.0660622], [-51.1953084, -30.0661363], [-51.1952945, -30.0662495], [-51.195264, -30.0663645], [-51.1951586, -30.0663018], [-51.1951002, -30.0662399], [-51.1950384, -30.066145], [-51.1950227, -30.0660997], [-51.1950157, -30.0660369], [-51.195007, -30.0659446], [-51.1949948, -30.0658705], [-51.194987, -30.0657982], [-51.19498, -30.065729], [-51.1949687, -30.0656462], [-51.1950569, -30.0656545], [-51.195061, -30.0656549], [-51.1951011, -30.0656671], [-51.1951429, -30.0656828], [-51.1952553, -30.0657028], [-51.1953302, -30.0657129]]]}}
+            ]
+        };
+
+        let weatherData = [
+            {Estação: "GUARUJÁ", "Temperatura (°C)": "27.9", "Precipitação (mm)": "0.0"},
+            {Estação: "ILHA DA PINTADA", "Temperatura (°C)": "29.5", "Precipitação (mm)": "0.0"},
+            {Estação: "ILHA DOS MARINHEIROS", "Temperatura (°C)": "28.6", "Precipitação (mm)": "0.0"},
+            {Estação: "LAMI", "Temperatura (°C)": "30.5", "Precipitação (mm)": "0.0"},
+            {Estação: "LOMBA DO SABÃO", "Temperatura (°C)": "30.9", "Precipitação (mm)": "0.0"},
+            {Estação: "PASSO DAS PEDRAS", "Temperatura (°C)": "30.3", "Precipitação (mm)": "0.0"},
+            {Estação: "RUA DA REPRESA", "Temperatura (°C)": "27.8", "Precipitação (mm)": "0.0"},
+            {Estação: "SARANDÍ | ASSIS BRASIL", "Temperatura (°C)": "28.8", "Precipitação (mm)": "0.0"},
+            {Estação: "SARANDÍ | NOVA BRASÍLIA", "Temperatura (°C)": "28.4", "Precipitação (mm)": "0.0"},
+            {Estação: "VILA FARRAPOS", "Temperatura (°C)": "28.5", "Precipitação (mm)": "0.0"}
+        ];
+
+        let occurrenceData = [];
+        let map, markersLayer, geojsonLayer, vehicleLayer;
+
+        // Dados de viaturas com status de conexão
+        let vehicleData = JSON.parse(localStorage.getItem('vehicleData')) || [
+            { name: "Viatura 01 - Alfa", lat: -30.0331, lng: -51.2300, status: "Desconectada", connected: false, username: "alfa", password: "1234" },
+            { name: "Viatura 02 - Bravo", lat: -30.2359, lng: -51.0857, status: "Desconectada", connected: false, username: "bravo", password: "5678" }
+        ];
+
+        const apiUrl = "https://e0o1b8ve03.execute-api.us-east-1.amazonaws.com/api/download-csv?contract_id=61898029-2a65-4789-93b3-d58be1898d93";
+        const baseUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQeosHxelakpL8SWlqQp18ChdaHGHLpSgVxSw1_gMV-0a-EsSDcum4ltfimhhFEDg/pub?output=csv";
+
+        function getCurrentDate() {
+            const today = new Date();
+            const day = String(today.getDate()).padStart(2, '0');
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const year = today.getFullYear();
+            return `${day}/${month}/${year}`;
+        }
+
+        function parseCSV(csvText) {
+            const lines = csvText.trim().split('\n');
+            const headers = lines[0].split(',').map(h => h.trim());
+            return lines.slice(10).map(line => {
+                const values = line.split(',').map(v => v.trim());
+                return {
+                    Data: values[0] || '',
+                    Hora: values[1] || '',
+                    Endereço: values[4] || '',
+                    Bairro: values[5] || '',
+                    Tipo: values[6] || '',
+                    Situação: values[9] || '',
+                    Prioridade: values[10] || ''
+                };
+            });
+        }
+
+        function parseWeatherCSV(csvText) {
+            const lines = csvText.trim().split('\n');
+            const headers = lines[1].split(',').map(h => h.trim());
+            const stationData = {};
+            lines.slice(2).forEach(line => {
+                const values = line.split(',').map(v => v.trim());
+                const station = values[0] || '';
+                const type = values[1] || '';
+                const value = values[2] || 'N/A';
+                if (!stationData[station]) {
+                    stationData[station] = { Estação: station };
+                }
+                if (type === "Temperatura (°C)" || type === "Precipitação (mm)") {
+                    stationData[station][type] = value;
+                }
+            });
+            return Object.values(stationData).slice(0, 10);
+        }
+
+        async function fetchWeatherData() {
+            try {
+                const response = await fetch(apiUrl);
+                if (!response.ok) throw new Error("Erro ao buscar dados da API");
+                const csvText = await response.text();
+                weatherData = parseWeatherCSV(csvText);
+                updateWeatherCards();
+            } catch (error) {
+                console.error("Erro ao buscar dados da API:", error);
+                updateWeatherCards();
+            }
+        }
+
+        async function geocodeAddress(address) {
+            const geocoder = new google.maps.Geocoder();
+            return new Promise((resolve) => {
+                geocoder.geocode({ address: address + ", Porto Alegre, RS, Brasil" }, (results, status) => {
+                    if (status === "OK" && results[0]) {
+                        const location = results[0].geometry.location;
+                        resolve({ Latitude: location.lat(), Longitude: location.lng() });
+                    } else {
+                        resolve({ Latitude: -30.0331, Longitude: -51.2300 });
+                    }
+                });
+            });
+        }
+
+        async function loadGoogleSheetData() {
+            try {
+                const proxyUrl = "https://cors-anywhere.herokuapp.com/";
+                const response = await fetch(proxyUrl + baseUrl);
+                if (!response.ok) throw new Error("Erro ao carregar o Google Sheets");
+                const csvText = await response.text();
+                occurrenceData = parseCSV(csvText);
+                document.getElementById('totalOccurrences').textContent = occurrenceData.length;
+            } catch (error) {
+                console.error("Erro ao carregar dados do Google Sheets:", error);
+                occurrenceData = [{Data:"17/01/2025",Hora:"15:10",Solicitante:"N/A",Endereço:"SETIMO CEU - R LIBERAL - 1",Bairro:"N/A",Tipo:"DESTELHAMENTO",Situação:"N/A",Prioridade:"N/A"}];
+                document.getElementById('totalOccurrences').textContent = occurrenceData.length;
+            }
+
+            const geocodePromises = occurrenceData.map(async (data, index) => {
+                if (data.Endereço) {
+                    const coords = await geocodeAddress(data.Endereço);
+                    occurrenceData[index].Latitude = coords.Latitude;
+                    occurrenceData[index].Longitude = coords.Longitude;
+                } else {
+                    occurrenceData[index].Latitude = -30.0331;
+                    occurrenceData[index].Longitude = -51.2300;
+                }
+            });
+
+            await Promise.all(geocodePromises);
+            updateOccurrences();
+        }
+
+        function updateWeatherCards() {
+            const cardsContainer = document.getElementById('weatherCards');
+            cardsContainer.innerHTML = '';
+            weatherData.forEach((data, index) => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.style.animationDelay = `${index * 0.1}s`;
+                card.innerHTML = `
+                    <h3>${data.Estação || 'N/A'}</h3>
+                    <p class="highlight-data temp">Temp: ${data["Temperatura (°C)"] || 'N/A'} °C</p>
+                    <p class="highlight-data precip">Precip: ${data["Precipitação (mm)"] || 'N/A'} mm</p>
+                    <canvas id="chart-${index}"></canvas>
+                `;
+                cardsContainer.appendChild(card);
+
+                const ctx = document.getElementById(`chart-${index}`);
+                if (ctx) {
+                    const gradient = ctx.getContext('2d').createLinearGradient(0, 0, 100, 0);
+                    gradient.addColorStop(0, 'rgba(0, 191, 255, 0.6)');
+                    gradient.addColorStop(0.5, 'rgba(255, 165, 0, 0.8)');
+                    gradient.addColorStop(1, 'rgba(255, 0, 0, 1)');
+
+                    new Chart(ctx.getContext('2d'), {
+                        type: 'bar',
+                        data: {
+                            labels: ['Temp (°C)', 'Precip (mm)'],
+                            datasets: [{
+                                label: 'Dados',
+                                data: [parseFloat(data["Temperatura (°C)"]) || 0, parseFloat(data["Precipitação (mm)"]) || 0],
+                                backgroundColor: [gradient, 'rgba(0, 191, 255, 0.6)'],
+                                borderColor: ['rgba(255, 0, 0, 1)', 'rgba(0, 191, 255, 1)'],
+                                borderWidth: 1,
+                                borderRadius: 5,
+                                barThickness: 20
+                            }]
+                        },
+                        options: {
+                            indexAxis: 'y',
+                            scales: {
+                                x: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#e0e0e0', font: { size: 12 } } },
+                                y: { ticks: { color: '#e0e0e0', font: { size: 12 } } }
+                            },
+                            plugins: { legend: { display: false }, title: { display: false } },
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            animation: {
+                                duration: 1000,
+                                easing: 'easeOutBounce'
+                            }
+                        }
+                    });
+                }
+            });
+        }
+
+        function updateOccurrences() {
+            updateMap();
+        }
+
+        const openIcon = L.icon({
+            iconUrl: 'https://cdn-icons-png.flaticon.com/512/252/252025.png',
+            iconSize: [35, 35],
+            iconAnchor: [17, 35],
+            popupAnchor: [0, -35]
+        });
+
+        const closedIcon = L.icon({
+            iconUrl: 'https://cdn-icons-png.flaticon.com/512/190/190411.png',
+            iconSize: [35, 35],
+            iconAnchor: [17, 35],
+            popupAnchor: [0, -35]
+        });
+
+        const vehicleAvailableIcon = L.icon({
+            iconUrl: 'https://cdn-icons-png.flaticon.com/512/3082/3082383.png', // Verde
+            iconSize: [35, 35],
+            iconAnchor: [17, 35],
+            popupAnchor: [0, -35]
+        });
+
+        const vehicleOnDutyIcon = L.icon({
+            iconUrl: 'https://cdn-icons-png.flaticon.com/512/3082/3082383.png', // Vermelho
+            iconSize: [35, 35],
+            iconAnchor: [17, 35],
+            popupAnchor: [0, -35]
+        });
+
+        function initMap() {
+            map = L.map('map').setView([-30.0331, -51.2300], 11);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+            markersLayer = L.layerGroup().addTo(map);
+            geojsonLayer = L.layerGroup().addTo(map);
+            vehicleLayer = L.layerGroup().addTo(map);
+            loadGoogleSheetData();
+            loadGeoJSONData();
+            updateVehicles();
+        }
+
+        function updateMap() {
+            markersLayer.clearLayers();
+            occurrenceData.forEach((data) => {
+                if (data.Latitude && data.Longitude && !isNaN(data.Latitude) && !isNaN(data.Longitude)) {
+                    const icon = (data.Situação && data.Situação.toLowerCase() === 'encerrada') ? closedIcon : openIcon;
+                    const marker = L.marker([parseFloat(data.Latitude), parseFloat(data.Longitude)], { icon: icon }).addTo(markersLayer);
+                    marker.bindPopup(`
+                        <b>${data.Endereço || 'Endereço não disponível'}</b><br>
+                        Tipo: ${data.Tipo || 'N/A'}<br>
+                        Bairro: ${data.Bairro || 'N/A'}<br>
+                        Data: ${data.Data || 'N/A'} ${data.Hora || ''}<br>
+                        Situação: ${data.Situação || 'N/A'}
+                    `);
+                }
+            });
+        }
+
+        function loadGeoJSONData() {
+            geojsonLayer.clearLayers();
+            if (geojsonDataExtra && geojsonDataExtra.features) {
+                const geojson = L.geoJSON(geojsonDataExtra, {
+                    style: function(feature) {
+                        switch (feature.properties.grau_risco) {
+                            case 'Alto': return { color: '#ff0000', weight: 2, opacity: 0.8, fillOpacity: 0.3 };
+                            case 'Muito alto': return { color: '#800080', weight: 2, opacity: 0.8, fillOpacity: 0.3 };
+                            default: return { color: '#3388ff', weight: 2, opacity: 0.8, fillOpacity: 0.3 };
+                        }
+                    },
+                    onEachFeature: function(feature, layer) {
+                        if (feature.properties) {
+                            const popupContent = `
+                                <b>Local:</b> ${feature.properties.local || 'Não informado'}<br>
+                                <b>Setor:</b> ${feature.properties.setor || 'Não informado'}<br>
+                                <b>Tipologia:</b> ${feature.properties.tipologia || 'Não informado'}<br>
+                                <b>Grau de Risco:</b> ${feature.properties.grau_risco || 'Não informado'}<br>
+                                <b>Link:</b> <a href="${feature.properties.link || '#'}" target="_blank">Ver PDF</a>
+                            `;
+                            layer.bindPopup(popupContent);
+                        }
+                    }
+                }).addTo(geojsonLayer);
+                map.fitBounds(geojson.getBounds());
+            }
+        }
+
+        function updateVehicles() {
+            vehicleLayer.clearLayers();
+            vehicleData = JSON.parse(localStorage.getItem('vehicleData')) || vehicleData;
+            vehicleData.forEach((vehicle) => {
+                // Só exibe no mapa se estiver conectado
+                if (vehicle.connected) {
+                    const icon = vehicle.status === "Disponível" ? vehicleAvailableIcon : vehicleOnDutyIcon;
+                    const marker = L.marker([vehicle.lat, vehicle.lng], { icon: icon }).addTo(vehicleLayer);
+                    marker.bindPopup(`
+                        <b>${vehicle.name}</b><br>
+                        Status: ${vehicle.status}<br>
+                        Lat: ${vehicle.lat.toFixed(4)}, Lng: ${vehicle.lng.toFixed(4)}
+                    `);
+                }
+            });
+        }
+
+        function checkVehicleStatus() {
+            vehicleData = JSON.parse(localStorage.getItem('vehicleData')) || vehicleData;
+            vehicleData.forEach((vehicle) => {
+                if (vehicle.connected) {
+                    let onDuty = false;
+                    occurrenceData.forEach((occurrence) => {
+                        if (occurrence.Latitude && occurrence.Longitude) {
+                            const dist = map.distance(
+                                [vehicle.lat, vehicle.lng],
+                                [parseFloat(occurrence.Latitude), parseFloat(occurrence.Longitude)]
+                            );
+                            if (dist < 500) {
+                                vehicle.status = `Na ocorrência: ${occurrence.Tipo || 'N/A'}`;
+                                onDuty = true;
+                            }
+                        }
+                    });
+                    if (!onDuty && vehicle.status.includes("Na ocorrência")) {
+                        vehicle.status = "Disponível";
+                    }
+                } else {
+                    vehicle.status = "Desconectada";
+                }
+            });
+            localStorage.setItem('vehicleData', JSON.stringify(vehicleData));
+            updateVehicles();
+        }
+
+        function setTheme(theme) {
+            document.body.classList.remove('light-theme', 'dc-theme');
+            if (theme === 'light') {
+                document.body.classList.add('light-theme');
+            } else if (theme === 'dc') {
+                document.body.classList.add('dc-theme');
+            }
+        }
+
+        window.onload = function() {
+            document.getElementById('dynamicTitle').textContent = `CEMADEC - Centro de Monitoramento e Alerta - ${getCurrentDate()}`;
+            fetchWeatherData();
+            setInterval(fetchWeatherData, 300000); // 5 minutos
+            loadGoogleSheetData();
+            setInterval(loadGoogleSheetData, 300000); // 5 minutos
+            setInterval(checkVehicleStatus, 10000); // Verifica viaturas a cada 10 segundos
+        };
+    </script>
+</body>
+</html>

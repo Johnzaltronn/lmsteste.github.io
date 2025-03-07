@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel do Motorista - CEMADEC</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .login-container, .tracking-container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            width: 300px;
+        }
+        .login-container h2, .tracking-container h2 {
+            margin-bottom: 20px;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        button {
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        #status {
+            margin-top: 20px;
+            font-size: 0.9em;
+            color: #333;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="login" class="login-container">
+        <h2>Login do Motorista</h2>
+        <input type="text" id="username" placeholder="Nome de usuário" />
+        <input type="password" id="password" placeholder="Senha" />
+        <button onclick="login()">Entrar</button>
+    </div>
+
+    <div id="tracking" class="tracking-container hidden">
+        <h2 id="vehicleName">Viatura</h2>
+        <p>Enviando localização...</p>
+        <div id="status"></div>
+        <button onclick="logout()">Sair</button>
+    </div>
+
+    <script>
+        const vehicles = [
+            { name: "Viatura 01 - Alfa", username: "alfa", password: "1234" },
+            { name: "Viatura 02 - Bravo", username: "bravo", password: "5678" }
+        ];
+
+        let currentVehicle = null;
+
+        function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const vehicle = vehicles.find(v => v.username === username && v.password === password);
+
+            if (vehicle) {
+                currentVehicle = vehicle;
+                document.getElementById('login').classList.add('hidden');
+                document.getElementById('tracking').classList.remove('hidden');
+                document.getElementById('vehicleName').textContent = vehicle.name;
+                startTracking();
+            } else {
+                alert('Usuário ou senha inválidos!');
+            }
+        }
+
+        function logout() {
+            // Marca a viatura como desconectada ao fazer logout
+            let vehicleData = JSON.parse(localStorage.getItem('vehicleData')) || [];
+            let vehicle = vehicleData.find(v => v.name === currentVehicle.name);
+            if (vehicle) {
+                vehicle.connected = false;
+                vehicle.status = "Desconectada";
+            }
+            localStorage.setItem('vehicleData', JSON.stringify(vehicleData));
+
+            currentVehicle = null;
+            document.getElementById('tracking').classList.add('hidden');
+            document.getElementById('login').classList.remove('hidden');
+            document.getElementById('status').textContent = '';
+        }
+
+        function startTracking() {
+            if (navigator.geolocation) {
+                navigator.geolocation.watchPosition(
+                    (position) => {
+                        const lat = position.coords.latitude;
+                        const lng = position.coords.longitude;
+                        document.getElementById('status').textContent = `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`;
+
+                        let vehicleData = JSON.parse(localStorage.getItem('vehicleData')) || [];
+                        let vehicle = vehicleData.find(v => v.name === currentVehicle.name);
+                        if (vehicle) {
+                            vehicle.lat = lat;
+                            vehicle.lng = lng;
+                            vehicle.connected = true; // Marca como conectada
+                            vehicle.status = "Disponível"; // Reseta o status ao conectar
+                        } else {
+                            vehicleData.push({ 
+                                name: currentVehicle.name, 
+                                lat, 
+                                lng, 
+                                status: "Disponível", 
+                                connected: true, 
+                                username: currentVehicle.username, 
+                                password: currentVehicle.password 
+                            });
+                        }
+                        localStorage.setItem('vehicleData', JSON.stringify(vehicleData));
+                    },
+                    (error) => {
+                        document.getElementById('status').textContent = 'Erro ao obter localização: ' + error.message;
+                    },
+                    { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
+                );
+            } else {
+                document.getElementById('status').textContent = 'Geolocalização não suportada.';
+            }
+        }
+    </script>
+</body>
+</html>
