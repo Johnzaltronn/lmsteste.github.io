@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Painel do Motorista - CEMADEC</title>
     <style>
-        /* CSS mantido - omitido aqui por brevidade */
         body {
             font-family: Arial, sans-serif;
             background: #f0f0f0;
@@ -75,8 +74,8 @@
             { name: "Viatura 02 - Bravo", username: "bravo", password: "5678" }
         ];
 
-        const jsonbinUrl = "https://api.jsonbin.io/v3/b/67cb5318ad19ca34f8184d73"; // Substitua por seu Bin ID
-        const jsonbinApiKey = "$2a$10$.Z1sVqmkYPjeCxw3g53NsOBEDuWGUslv4AfvwhV7HabN/RtcqIn5y"; // Substitua por sua chave de API do JSONBin
+        const jsonbinUrl = "https://api.jsonbin.io/v3/b/67cb5318ad19ca34f8184d73"; // Bin ID fornecido
+        const jsonbinApiKey = "$2a$10$.Z1sVqmkYPjeCxw3g53NsOBEDuWGUslv4AfvwhV7HabN/RtcqIn5y"; // API Key fornecida
 
         let currentVehicle = null;
 
@@ -102,7 +101,7 @@
                     headers: { "X-Master-Key": jsonbinApiKey }
                 });
                 const data = await response.json();
-                let vehicleData = data.record.vehicles;
+                let vehicleData = data.record.vehicles || [];
                 let vehicle = vehicleData.find(v => v.name === currentVehicle.name);
                 if (vehicle) {
                     vehicle.connected = false;
@@ -139,7 +138,7 @@
                                 headers: { "X-Master-Key": jsonbinApiKey }
                             });
                             const data = await response.json();
-                            let vehicleData = data.record.vehicles;
+                            let vehicleData = data.record.vehicles || [];
                             let vehicle = vehicleData.find(v => v.name === currentVehicle.name);
                             if (vehicle) {
                                 vehicle.lat = lat;
