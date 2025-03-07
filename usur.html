@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Painel do Motorista - CEMADEC</title>
     <style>
+        /* CSS mantido - omitido aqui por brevidade */
         body {
             font-family: Arial, sans-serif;
             background: #f0f0f0;
@@ -74,9 +75,12 @@
             { name: "Viatura 02 - Bravo", username: "bravo", password: "5678" }
         ];
 
+        const jsonbinUrl = "https://api.jsonbin.io/v3/b/67cb5318ad19ca34f8184d73"; // Substitua por seu Bin ID
+        const jsonbinApiKey = "$2a$10$.Z1sVqmkYPjeCxw3g53NsOBEDuWGUslv4AfvwhV7HabN/RtcqIn5y"; // Substitua por sua chave de API do JSONBin
+
         let currentVehicle = null;
 
-        function login() {
+        async function login() {
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
             const vehicle = vehicles.find(v => v.username === username && v.password === password);
@@ -92,15 +96,29 @@
             }
         }
 
-        function logout() {
-            // Marca a viatura como desconectada ao fazer logout
-            let vehicleData = JSON.parse(localStorage.getItem('vehicleData')) || [];
-            let vehicle = vehicleData.find(v => v.name === currentVehicle.name);
-            if (vehicle) {
-                vehicle.connected = false;
-                vehicle.status = "Desconectada";
+        async function logout() {
+            try {
+                const response = await fetch(jsonbinUrl, {
+                    headers: { "X-Master-Key": jsonbinApiKey }
+                });
+                const data = await response.json();
+                let vehicleData = data.record.vehicles;
+                let vehicle = vehicleData.find(v => v.name === currentVehicle.name);
+                if (vehicle) {
+                    vehicle.connected = false;
+                    vehicle.status = "Desconectada";
+                }
+                await fetch(jsonbinUrl, {
+                    method: 'PUT',
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-Master-Key": jsonbinApiKey
+                    },
+                    body: JSON.stringify({ vehicles: vehicleData })
+                });
+            } catch (error) {
+                console.error("Erro ao desconectar viatura:", error);
             }
-            localStorage.setItem('vehicleData', JSON.stringify(vehicleData));
 
             currentVehicle = null;
             document.getElementById('tracking').classList.add('hidden');
@@ -108,33 +126,48 @@
             document.getElementById('status').textContent = '';
         }
 
-        function startTracking() {
+        async function startTracking() {
             if (navigator.geolocation) {
                 navigator.geolocation.watchPosition(
-                    (position) => {
+                    async (position) => {
                         const lat = position.coords.latitude;
                         const lng = position.coords.longitude;
                         document.getElementById('status').textContent = `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`;
 
-                        let vehicleData = JSON.parse(localStorage.getItem('vehicleData')) || [];
-                        let vehicle = vehicleData.find(v => v.name === currentVehicle.name);
-                        if (vehicle) {
-                            vehicle.lat = lat;
-                            vehicle.lng = lng;
-                            vehicle.connected = true; // Marca como conectada
-                            vehicle.status = "Disponível"; // Reseta o status ao conectar
-                        } else {
-                            vehicleData.push({ 
-                                name: currentVehicle.name, 
-                                lat, 
-                                lng, 
-                                status: "Disponível", 
-                                connected: true, 
-                                username: currentVehicle.username, 
-                                password: currentVehicle.password 
+                        try {
+                            const response = await fetch(jsonbinUrl, {
+                                headers: { "X-Master-Key": jsonbinApiKey }
                             });
+                            const data = await response.json();
+                            let vehicleData = data.record.vehicles;
+                            let vehicle = vehicleData.find(v => v.name === currentVehicle.name);
+                            if (vehicle) {
+                                vehicle.lat = lat;
+                                vehicle.lng = lng;
+                                vehicle.connected = true;
+                                vehicle.status = "Disponível";
+                            } else {
+                                vehicleData.push({
+                                    name: currentVehicle.name,
+                                    lat,
+                                    lng,
+                                    status: "Disponível",
+                                    connected: true,
+                                    username: currentVehicle.username,
+                                    password: currentVehicle.password
+                                });
+                            }
+                            await fetch(jsonbinUrl, {
+                                method: 'PUT',
+                                headers: {
+                                    "Content-Type": "application/json",
+                                    "X-Master-Key": jsonbinApiKey
+                                },
+                                body: JSON.stringify({ vehicles: vehicleData })
+                            });
+                        } catch (error) {
+                            console.error("Erro ao enviar localização:", error);
                         }
-                        localStorage.setItem('vehicleData', JSON.stringify(vehicleData));
                     },
                     (error) => {
                         document.getElementById('status').textContent = 'Erro ao obter localização: ' + error.message;
