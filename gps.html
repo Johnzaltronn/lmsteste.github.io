@@ -9,7 +9,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyC13UTbnQp__ewEYpnQusB7br_ShjphJ1I&callback=initMap"></script>
     <style>
-        /* CSS original mantido */
+        /* CSS original completo */
         * {
             margin: 0;
             padding: 0;
@@ -401,14 +401,12 @@
         let occurrenceData = [];
         let map, markersLayer, geojsonLayer, vehicleLayer;
 
-        // Dados de viaturas com status de conexão
-        let vehicleData = JSON.parse(localStorage.getItem('vehicleData')) || [
-            { name: "Viatura 01 - Alfa", lat: -30.0331, lng: -51.2300, status: "Desconectada", connected: false, username: "alfa", password: "1234" },
-            { name: "Viatura 02 - Bravo", lat: -30.2359, lng: -51.0857, status: "Desconectada", connected: false, username: "bravo", password: "5678" }
-        ];
-
         const apiUrl = "https://e0o1b8ve03.execute-api.us-east-1.amazonaws.com/api/download-csv?contract_id=61898029-2a65-4789-93b3-d58be1898d93";
         const baseUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQeosHxelakpL8SWlqQp18ChdaHGHLpSgVxSw1_gMV-0a-EsSDcum4ltfimhhFEDg/pub?output=csv";
+        const jsonbinUrl = "https://api.jsonbin.io/v3/b/67cb5318ad19ca34f8184d73"; // SUBSTITUA PELO SEU BIN ID REAL
+        const jsonbinApiKey = "$2a$10$.Z1sVqmkYPjeCxw3g53NsOBEDuWGUslv4AfvwhV7HabN/RtcqIn5y 
+
+"; // SUBSTITUA PELA SUA API KEY REAL
 
         function getCurrentDate() {
             const today = new Date();
@@ -607,7 +605,7 @@
             vehicleLayer = L.layerGroup().addTo(map);
             loadGoogleSheetData();
             loadGeoJSONData();
-            updateVehicles();
+            fetchVehicleData();
         }
 
         function updateMap() {
@@ -655,11 +653,23 @@
             }
         }
 
-        function updateVehicles() {
+        async function fetchVehicleData() {
+            try {
+                const response = await fetch(jsonbinUrl, {
+                    headers: { "X-Master-Key": jsonbinApiKey }
+                });
+                const data = await response.json();
+                const vehicleData = data.record.vehicles;
+                updateVehicles(vehicleData);
+                checkVehicleStatus(vehicleData);
+            } catch (error) {
+                console.error("Erro ao buscar dados das viaturas:", error);
+            }
+        }
+
+        function updateVehicles(vehicleData) {
             vehicleLayer.clearLayers();
-            vehicleData = JSON.parse(localStorage.getItem('vehicleData')) || vehicleData;
             vehicleData.forEach((vehicle) => {
-                // Só exibe no mapa se estiver conectado
                 if (vehicle.connected) {
                     const icon = vehicle.status === "Disponível" ? vehicleAvailableIcon : vehicleOnDutyIcon;
                     const marker = L.marker([vehicle.lat, vehicle.lng], { icon: icon }).addTo(vehicleLayer);
@@ -672,8 +682,7 @@
             });
         }
 
-        function checkVehicleStatus() {
-            vehicleData = JSON.parse(localStorage.getItem('vehicleData')) || vehicleData;
+        async function checkVehicleStatus(vehicleData) {
             vehicleData.forEach((vehicle) => {
                 if (vehicle.connected) {
                     let onDuty = false;
@@ -696,8 +705,15 @@
                     vehicle.status = "Desconectada";
                 }
             });
-            localStorage.setItem('vehicleData', JSON.stringify(vehicleData));
-            updateVehicles();
+            await fetch(jsonbinUrl, {
+                method: 'PUT',
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-Master-Key": jsonbinApiKey
+                },
+                body: JSON.stringify({ vehicles: vehicleData })
+            });
+            updateVehicles(vehicleData);
         }
 
         function setTheme(theme) {
@@ -715,7 +731,7 @@
             setInterval(fetchWeatherData, 300000); // 5 minutos
             loadGoogleSheetData();
             setInterval(loadGoogleSheetData, 300000); // 5 minutos
-            setInterval(checkVehicleStatus, 10000); // Verifica viaturas a cada 10 segundos
+            setInterval(fetchVehicleData, 10000); // Atualiza viaturas a cada 10 segundos
         };
     </script>
 </body>
