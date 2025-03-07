@@ -9,7 +9,6 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyC13UTbnQp__ewEYpnQusB7br_ShjphJ1I&callback=initMap"></script>
     <style>
-        /* CSS original completo */
         * {
             margin: 0;
             padding: 0;
@@ -374,7 +373,6 @@
     </div>
 
     <script>
-        // Dados GeoJSON originais
         var geojsonDataExtra = {
             "type": "FeatureCollection",
             "name": "analise_risco_geologico_cprm",
@@ -403,10 +401,8 @@
 
         const apiUrl = "https://e0o1b8ve03.execute-api.us-east-1.amazonaws.com/api/download-csv?contract_id=61898029-2a65-4789-93b3-d58be1898d93";
         const baseUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQeosHxelakpL8SWlqQp18ChdaHGHLpSgVxSw1_gMV-0a-EsSDcum4ltfimhhFEDg/pub?output=csv";
-        const jsonbinUrl = "https://api.jsonbin.io/v3/b/67cb5318ad19ca34f8184d73"; // SUBSTITUA PELO SEU BIN ID REAL
-        const jsonbinApiKey = "$2a$10$.Z1sVqmkYPjeCxw3g53NsOBEDuWGUslv4AfvwhV7HabN/RtcqIn5y 
-
-"; // SUBSTITUA PELA SUA API KEY REAL
+        const jsonbinUrl = "https://api.jsonbin.io/v3/b/67cb5318ad19ca34f8184d73"; // Bin ID fornecido
+        const jsonbinApiKey = "$2a$10$.Z1sVqmkYPjeCxw3g53NsOBEDuWGUslv4AfvwhV7HabN/RtcqIn5y"; // API Key fornecida
 
         function getCurrentDate() {
             const today = new Date();
@@ -461,7 +457,7 @@
                 updateWeatherCards();
             } catch (error) {
                 console.error("Erro ao buscar dados da API:", error);
-                updateWeatherCards();
+                updateWeatherCards(); // Usa dados padrão em caso de erro
             }
         }
 
@@ -481,31 +477,32 @@
 
         async function loadGoogleSheetData() {
             try {
-                const proxyUrl = "https://cors-anywhere.herokuapp.com/";
-                const response = await fetch(proxyUrl + baseUrl);
+                const proxyUrl = "https://corsproxy.io/?"; // Proxy alternativo para evitar CORS
+                const response = await fetch(proxyUrl + encodeURIComponent(baseUrl));
                 if (!response.ok) throw new Error("Erro ao carregar o Google Sheets");
                 const csvText = await response.text();
                 occurrenceData = parseCSV(csvText);
                 document.getElementById('totalOccurrences').textContent = occurrenceData.length;
+
+                const geocodePromises = occurrenceData.map(async (data, index) => {
+                    if (data.Endereço) {
+                        const coords = await geocodeAddress(data.Endereço);
+                        occurrenceData[index].Latitude = coords.Latitude;
+                        occurrenceData[index].Longitude = coords.Longitude;
+                    } else {
+                        occurrenceData[index].Latitude = -30.0331;
+                        occurrenceData[index].Longitude = -51.2300;
+                    }
+                });
+
+                await Promise.all(geocodePromises);
+                updateMap();
             } catch (error) {
                 console.error("Erro ao carregar dados do Google Sheets:", error);
-                occurrenceData = [{Data:"17/01/2025",Hora:"15:10",Solicitante:"N/A",Endereço:"SETIMO CEU - R LIBERAL - 1",Bairro:"N/A",Tipo:"DESTELHAMENTO",Situação:"N/A",Prioridade:"N/A"}];
+                occurrenceData = [{Data:"17/01/2025",Hora:"15:10",Solicitante:"N/A",Endereço:"SETIMO CEU - R LIBERAL - 1",Bairro:"N/A",Tipo:"DESTELHAMENTO",Situação:"N/A",Prioridade:"N/A",Latitude:-30.0331,Longitude:-51.2300}];
                 document.getElementById('totalOccurrences').textContent = occurrenceData.length;
+                updateMap();
             }
-
-            const geocodePromises = occurrenceData.map(async (data, index) => {
-                if (data.Endereço) {
-                    const coords = await geocodeAddress(data.Endereço);
-                    occurrenceData[index].Latitude = coords.Latitude;
-                    occurrenceData[index].Longitude = coords.Longitude;
-                } else {
-                    occurrenceData[index].Latitude = -30.0331;
-                    occurrenceData[index].Longitude = -51.2300;
-                }
-            });
-
-            await Promise.all(geocodePromises);
-            updateOccurrences();
         }
 
         function updateWeatherCards() {
@@ -563,10 +560,6 @@
             });
         }
 
-        function updateOccurrences() {
-            updateMap();
-        }
-
         const openIcon = L.icon({
             iconUrl: 'https://cdn-icons-png.flaticon.com/512/252/252025.png',
             iconSize: [35, 35],
@@ -582,33 +575,36 @@
         });
 
         const vehicleAvailableIcon = L.icon({
-            iconUrl: 'https://cdn-icons-png.flaticon.com/512/3082/3082383.png', // Verde
+            iconUrl: 'https://cdn-icons-png.flaticon.com/512/3082/3082383.png',
             iconSize: [35, 35],
             iconAnchor: [17, 35],
             popupAnchor: [0, -35]
         });
 
         const vehicleOnDutyIcon = L.icon({
-            iconUrl: 'https://cdn-icons-png.flaticon.com/512/3082/3082383.png', // Vermelho
+            iconUrl: 'https://cdn-icons-png.flaticon.com/512/3082/3082383.png',
             iconSize: [35, 35],
             iconAnchor: [17, 35],
             popupAnchor: [0, -35]
         });
 
         function initMap() {
-            map = L.map('map').setView([-30.0331, -51.2300], 11);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            }).addTo(map);
-            markersLayer = L.layerGroup().addTo(map);
-            geojsonLayer = L.layerGroup().addTo(map);
-            vehicleLayer = L.layerGroup().addTo(map);
+            if (!map) {
+                map = L.map('map').setView([-30.0331, -51.2300], 11);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                }).addTo(map);
+                markersLayer = L.layerGroup().addTo(map);
+                geojsonLayer = L.layerGroup().addTo(map);
+                vehicleLayer = L.layerGroup().addTo(map);
+            }
             loadGoogleSheetData();
             loadGeoJSONData();
             fetchVehicleData();
         }
 
         function updateMap() {
+            if (!markersLayer) return;
             markersLayer.clearLayers();
             occurrenceData.forEach((data) => {
                 if (data.Latitude && data.Longitude && !isNaN(data.Latitude) && !isNaN(data.Longitude)) {
@@ -626,6 +622,7 @@
         }
 
         function loadGeoJSONData() {
+            if (!geojsonLayer) return;
             geojsonLayer.clearLayers();
             if (geojsonDataExtra && geojsonDataExtra.features) {
                 const geojson = L.geoJSON(geojsonDataExtra, {
@@ -658,8 +655,9 @@
                 const response = await fetch(jsonbinUrl, {
                     headers: { "X-Master-Key": jsonbinApiKey }
                 });
+                if (!response.ok) throw new Error("Erro ao buscar dados do JSONBin");
                 const data = await response.json();
-                const vehicleData = data.record.vehicles;
+                const vehicleData = data.record.vehicles || [];
                 updateVehicles(vehicleData);
                 checkVehicleStatus(vehicleData);
             } catch (error) {
@@ -668,6 +666,7 @@
         }
 
         function updateVehicles(vehicleData) {
+            if (!vehicleLayer) return;
             vehicleLayer.clearLayers();
             vehicleData.forEach((vehicle) => {
                 if (vehicle.connected) {
@@ -683,6 +682,7 @@
         }
 
         async function checkVehicleStatus(vehicleData) {
+            if (!vehicleData) return;
             vehicleData.forEach((vehicle) => {
                 if (vehicle.connected) {
                     let onDuty = false;
@@ -705,14 +705,18 @@
                     vehicle.status = "Desconectada";
                 }
             });
-            await fetch(jsonbinUrl, {
-                method: 'PUT',
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-Master-Key": jsonbinApiKey
-                },
-                body: JSON.stringify({ vehicles: vehicleData })
-            });
+            try {
+                await fetch(jsonbinUrl, {
+                    method: 'PUT',
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-Master-Key": jsonbinApiKey
+                    },
+                    body: JSON.stringify({ vehicles: vehicleData })
+                });
+            } catch (error) {
+                console.error("Erro ao atualizar dados no JSONBin:", error);
+            }
             updateVehicles(vehicleData);
         }
 
@@ -729,8 +733,7 @@
             document.getElementById('dynamicTitle').textContent = `CEMADEC - Centro de Monitoramento e Alerta - ${getCurrentDate()}`;
             fetchWeatherData();
             setInterval(fetchWeatherData, 300000); // 5 minutos
-            loadGoogleSheetData();
-            setInterval(loadGoogleSheetData, 300000); // 5 minutos
+            initMap(); // Inicializa o mapa primeiro
             setInterval(fetchVehicleData, 10000); // Atualiza viaturas a cada 10 segundos
         };
     </script>
